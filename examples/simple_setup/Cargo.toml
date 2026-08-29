@@ -1,0 +1,50 @@
+[package]
+name = "simple_setup"
+version = "0.29.0"
+authors = ["Charles Bournhonesque <charlesbour@gmail.com>"]
+edition = "2021"
+description = "Examples for the lightyearServer-client networking library for the Bevy game engine"
+readme = "README.md"
+repository = "https://github.com/cBournhonesque/lightyear"
+keywords = ["bevy", "multiplayer", "networking", "netcode", "gamedev"]
+categories = ["game-development", "network-programming"]
+license = "MIT OR Apache-2.0"
+publish = false
+
+[features]
+default = ["client", "server", "netcode", "webtransport"]
+client = ["lightyear/client"]
+gui = []
+server = ["lightyear/server"]
+netcode = ["lightyear/netcode"]
+webtransport = [
+  "lightyear/webtransport",
+  "lightyear/webtransport_self_signed",
+  "lightyear/webtransport_dangerous_configuration",
+]
+udp = ["lightyear/udp"]
+
+[dependencies]
+cfg-if.workspace = true
+clap.workspace = true
+lightyear = { workspace = true, features = ["replication"] }
+bevy = { workspace = true, features = [
+  "bevy_render",
+  "bevy_core_pipeline",
+  "bevy_winit",
+  "bevy_window",
+  "x11",
+  "wayland",
+] }
+serde.workspace = true
+
+[target."cfg(not(target_family = \"wasm\"))".dependencies]
+async-compat.workspace = true
+
+[package.metadata.bevy_cli.web]
+rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+default-features = false
+features = ["client", "gui", "netcode", "webtransport"]
+
+[lints]
+workspace = true

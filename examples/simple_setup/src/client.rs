@@ -1,0 +1,75 @@
+//! The client plugin.
+use crate::automation::{ClientStartupConfig, Headless};
+use crate::shared::*;
+use bevy::prelude::*;
+use core::net::Ipv4Addr;
+use core::net::{IpAddr, SocketAddr};
+use lightyear::netcode::Key;
+use lightyear::prelude::client::*;
+use lightyear::prelude::*;
+
+pub struct ExampleClientPlugin;
+
+const CLIENT_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 4000);
+
+impl Plugin for ExampleClientPlugin {
+    fn build(&self, app: &mut App) {
+        // add our client-specific logic. Here we will just connect to the server
+        app.add_systems(Startup, startup);
+    }
+}
+
+/// Spawn a client that connects to the server
+fn startup(
+    mut commands: Commands,
+    config: Res<ClientStartupConfig>,
+    headless: Res<Headless>,
+) -> Result {
+    if !headless.0 {
+        commands.spawn(Camera2d);
+    }
+    let client = if let Some(server) = config.host_server {
+        commands
+            .spawn((Client, Name::new("HostClient"), LinkOf { server }))
+            .id()
+    } else {
+        let auth = Authentication::Manual {
+            server_addr: SERVER_ADDR,
+            client_id: config.client_id,
+            private_key: Key::default(),
+            protocol_id: 0,
+        };
+        commands
+            .spawn((
+                Client,
+                LocalAddr(CLIENT_ADDR),
+                PeerAddr(SERVER_ADDR),
+                Link::default(),
+                ReplicationReceiver,
+                NetcodeClient::new(auth, NetcodeConfig::default())?,
+                #[cfg(feature = "webtransport")]
+                WebTransportClientIo {
+                    certificate_digest: {
+                        #[cfg(target_family = "wasm")]
+                        {
+                            include_str!("../../../certificates/digest.txt").to_string()
+                        }
+                        #[cfg(not(target_family = "wasm"))]
+                        {
+                            "".to_string()
+                        }
+                    },
+                    target: None,
+                },
+                #[cfg(all(
+                    not(feature = "webtransport"),
+                    feature = "udp",
+                    not(target_family = "wasm")
+                ))]
+                UdpIo::default(),
+            ))
+            .id()
+    };
+    commands.trigger(Connect { entity: client });
+    Ok(())
+}
